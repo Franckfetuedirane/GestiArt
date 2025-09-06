@@ -1,0 +1,22 @@
+from rest_framework import serializers
+from .models import Artisan
+from users.models import User
+from users.serializers import UserSerializer
+
+class ArtisanSerializer(serializers.ModelSerializer):
+    """
+    Serializer for the Artisan model.
+    Includes nested UserSerializer for read-only user details.
+    Allows specifying user_id for admin users during creation.
+    """
+    user = UserSerializer(read_only=True)
+    user_id = serializers.PrimaryKeyRelatedField(queryset=User.objects.all(), source='user', write_only=True, required=False)
+
+    class Meta:
+        """
+        Meta class for ArtisanSerializer.
+        Defines the model and fields to be serialized.
+        """
+        model = Artisan
+        fields = ('user', 'user_id', 'first_name', 'last_name', 'speciality', 'contact_phone', 'contact_email', 'date_joined', 'department', 'image')
+        read_only_fields = ('date_joined',)
