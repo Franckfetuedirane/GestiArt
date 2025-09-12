@@ -1,7 +1,7 @@
 from django.shortcuts import render
 from rest_framework import viewsets
-from .models import Produit
-from .serializers import ProduitSerializer
+from .models import Produit, Categorie
+from .serializers import ProduitSerializer, CategorieSerializer
 from users.permissions import IsAdminUser, IsArtisanUser, IsAdminOrReadOnly
 
 # Create your views here.
@@ -31,15 +31,37 @@ class ProduitViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         """
-        Performs creation of a product.
-        If the user is an admin, `artisan_id` must be provided in the request data.
-        If the user is an artisan, the product is automatically associated with their profile.
+        Associates the current user as the artisan when creating a new product.
+        Only admins can specify a different artisan.
         """
-        if self.request.user.user_type == 'admin':
-            artisan_id = self.request.data.get('artisan_id')
-            if not artisan_id:
-                raise serializers.ValidationError({'artisan_id': 'This field is required for admin users.'})
-            serializer.save(artisan_id=artisan_id)
+        if self.request.user.user_type == 'artisan':
+            # For artisans, automatically associate them as the product's artisan
+            artisan = Artisan.objects.get(user=self.request.user)
+            serializer.save(artisan=artisan)
         else:
-            # For artisan users, associate the product with their own artisan profile
-            serializer.save(artisan=self.request.user.artisan_profile)
+            # For admins, use the provided artisan or default to the current user's artisan profile if exists
+            if 'artisan' not in serializer.validated_data:
+                try:
+                    artisan = Artisan.objects.get(user=self.request.user)
+                    serializer.save(artisan=artisan)
+                except Artisan.DoesNotExist:
+                    serializer.save()
+
+
+class CategorieViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint pour gérer les catégories.
+    
+    Permissions :
+    - Tous les utilisateurs authentifiés peuvent lister les catégories.
+    - Seuls les administrateurs peuvent créer, modifier ou supprimer des catégories.
+    """
+    queryset = Categorie.objects.all()
+    serializer_class = CategorieSerializer
+    permission_classes = [IsAdminOrReadOnly]
+    
+    def get_queryset(self):
+        """
+        Retourne toutes les catégories triées par nom.
+        """
+        return Categorie.objects.all().order_by('nom')

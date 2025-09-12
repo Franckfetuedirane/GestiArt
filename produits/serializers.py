@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Produit
+from .models import Produit, Categorie
 from artisans.models import Artisan
 from artisans.serializers import ArtisanSerializer
 
@@ -19,8 +19,8 @@ class ProduitSerializer(serializers.ModelSerializer):
         Defines the model and fields to be serialized, and read-only fields.
         """
         model = Produit
-        fields = ('id', 'name', 'description', 'category', 'price', 'stock', 'date_added', 'artisan', 'artisan_id', 'image')
-        read_only_fields = ('date_added',)
+        fields = ['id', 'name', 'description', 'categorie', 'price', 'stock', 'artisan', 'artisan_id', 'date_added', 'image']
+        read_only_fields = ['id', 'date_added']
 
     def validate_stock(self, value):
         """
@@ -37,3 +37,14 @@ class ProduitSerializer(serializers.ModelSerializer):
         if value <= 0:
             raise serializers.ValidationError("Le prix doit être supérieur à zéro.")
         return value
+
+
+class CategorieSerializer(serializers.ModelSerializer):
+    """
+    Serializer pour le modèle Categorie.
+    Permet de sérialiser et désérialiser les catégories.
+    """
+    class Meta:
+        model = Categorie
+        fields = ['id', 'nom', 'description', 'date_creation', 'date_mise_a_jour']
+        read_only_fields = ['id', 'date_creation', 'date_mise_a_jour']

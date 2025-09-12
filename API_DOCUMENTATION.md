@@ -35,7 +35,7 @@ Pour démarrer le projet localement, suivez les étapes suivantes :
             'NAME': 'gestiart_db', # Nom de votre base de données
             'USER': 'root',         # Votre nom d'utilisateur MySQL
             'PASSWORD': 'password', # Votre mot de passe MySQL
-            'HOST': 'localhost',
+            'HOST': 'localhost',ccc
             'PORT': '3306',
             'OPTIONS': {
                 'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",

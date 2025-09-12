@@ -1,6 +1,24 @@
 from django.db import models
 from artisans.models import Artisan
 
+class Categorie(models.Model):
+    """
+    Représente une catégorie de produits dans l'application GestiArt.
+    Chaque catégorie a un nom et une description.
+    """
+    nom = models.CharField(max_length=100, unique=True)
+    description = models.TextField(blank=True, null=True)
+    date_creation = models.DateTimeField(auto_now_add=True)
+    date_mise_a_jour = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Catégorie"
+        verbose_name_plural = "Catégories"
+        ordering = ['nom']
+
+    def __str__(self):
+        return self.nom
+
 class Produit(models.Model):
     """
     Represents a product created by an Artisan in the GestiArt application.
@@ -9,7 +27,14 @@ class Produit(models.Model):
     """
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
-    category = models.CharField(max_length=100)
+    categorie = models.ForeignKey(
+        Categorie, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        related_name='produits',
+        verbose_name="Catégorie"
+    )
     price = models.DecimalField(max_digits=10, decimal_places=2)
     stock = models.IntegerField(default=0)
     date_added = models.DateField(auto_now_add=True)
