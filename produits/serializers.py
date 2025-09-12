@@ -2,8 +2,6 @@ from rest_framework import serializers
 from .models import Produit
 from artisans.models import Artisan
 from artisans.serializers import ArtisanSerializer
-from categories.serializers import CategorySerializer
-from categories.models import Category
 
 class ProduitSerializer(serializers.ModelSerializer):
     """
@@ -13,13 +11,7 @@ class ProduitSerializer(serializers.ModelSerializer):
     Also includes custom validations for `stock` and `price`.
     """
     artisan = ArtisanSerializer(read_only=True)
-    artisan_id = serializers.PrimaryKeyRelatedField(
-        queryset=Artisan.objects.all(), source='artisan', write_only=True, required=False
-    )
-    category = CategorySerializer(read_only=True)
-    category_id = serializers.PrimaryKeyRelatedField(
-        queryset=Category.objects.all(), source='category', write_only=True, required=False
-    )
+    artisan_id = serializers.PrimaryKeyRelatedField(queryset=Artisan.objects.all(), source='artisan', write_only=True, required=False)
 
     class Meta:
         """
@@ -27,10 +19,7 @@ class ProduitSerializer(serializers.ModelSerializer):
         Defines the model and fields to be serialized, and read-only fields.
         """
         model = Produit
-        fields = (
-            'id', 'name', 'description', 'category', 'category_id', 'price',
-            'stock', 'date_added', 'artisan', 'artisan_id', 'image'
-        )
+        fields = ('id', 'name', 'description', 'category', 'price', 'stock', 'date_added', 'artisan', 'artisan_id', 'image')
         read_only_fields = ('date_added',)
 
     def validate_stock(self, value):
