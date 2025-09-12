@@ -1,5 +1,6 @@
 from django.db import models
 from artisans.models import Artisan
+from categories.models import Category
 
 class Produit(models.Model):
     """
@@ -9,7 +10,7 @@ class Produit(models.Model):
     """
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
-    category = models.CharField(max_length=100)
+    category = models.ForeignKey(Category, related_name='products', on_delete=models.SET_NULL, null=True, blank=True)
     price = models.DecimalField(max_digits=10, decimal_places=2)
     stock = models.IntegerField(default=0)
     date_added = models.DateField(auto_now_add=True)
