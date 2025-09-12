@@ -19,7 +19,10 @@ class ProduitSerializer(serializers.ModelSerializer):
         Defines the model and fields to be serialized, and read-only fields.
         """
         model = Produit
-        fields = ['id', 'name', 'description', 'categorie', 'price', 'stock', 'artisan', 'artisan_id', 'date_added', 'image']
+        fields = [
+            'id', 'name', 'description', 'categorie', 'price', 'stock', 
+            'numero_boutique', 'artisan', 'artisan_id', 'date_added', 'image'
+        ]
         read_only_fields = ['id', 'date_added']
 
     def validate_stock(self, value):

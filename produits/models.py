@@ -35,9 +35,10 @@ class Produit(models.Model):
         related_name='produits',
         verbose_name="Catégorie"
     )
-    price = models.DecimalField(max_digits=10, decimal_places=2)
-    stock = models.IntegerField(default=0)
-    date_added = models.DateField(auto_now_add=True)
+    price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Prix")
+    stock = models.IntegerField(default=0, verbose_name="Quantité en stock")
+    numero_boutique = models.CharField(max_length=50, blank=True, null=True, verbose_name="Numéro de boutique")
+    date_added = models.DateField(auto_now_add=True, verbose_name="Date d'ajout")
     artisan = models.ForeignKey(Artisan, on_delete=models.CASCADE, related_name='products')
     image = models.ImageField(upload_to='produits_images/', blank=True, null=True)
 

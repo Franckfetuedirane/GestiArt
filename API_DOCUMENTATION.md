@@ -2,7 +2,7 @@
 
 Bienvenue dans la documentation de l'API REST pour GestiArt, une application de gestion d'activités artisanales pour le Village Artisanal Régional de Bafoussam (VARBAF). Cette API est conçue pour moderniser la gestion artisanale en digitalisant la gestion des artisans, des produits, le suivi des ventes, et le calcul de statistiques et rapports.
 
-L'API est construite avec Django et Django REST Framework, et utilise l'authentification **Basic** pour sécuriser les endpoints. Elle est organisée en modules (Artisans, Produits, Ventes, Statistiques, Utilisateurs) avec des endpoints clairs et structurés.
+L'API est construite avec Django et Django REST Framework, et utilise l'authentification **Basic** pour sécuriser les endpoints. Elle est organisée en modules (Artisans, Produits, Catégories, Ventes, Statistiques, Utilisateurs) avec des endpoints clairs et structurés.
 
 ## Table des Matières
 
@@ -10,8 +10,9 @@ L'API est construite avec Django et Django REST Framework, et utilise l'authenti
 2.  [Module Utilisateurs](#2-module-utilisateurs)
 3.  [Module Artisans](#3-module-artisans)
 4.  [Module Produits](#4-module-produits)
-5.  [Module Ventes](#5-module-ventes)
-6.  [Module Statistiques](#6-module-statistiques)
+5.  [Module Catégories](#5-module-catégories)
+6.  [Module Ventes](#6-module-ventes)
+7.  [Module Statistiques](#7-module-statistiques)
 
 ## Configuration et Démarrage
 
@@ -279,7 +280,52 @@ Ce module permet de gérer les profils des artisans. Chaque profil est lié à u
 
 ## 4. Module Produits
 
-Ce module gère le catalogue des produits artisanaux. Seuls les administrateurs peuvent créer, modifier ou supprimer des produits. Les artisans peuvent créer et gérer leurs propres produits.
+Gestion complète des produits artisanaux avec suivi des stocks et catégorisation.
+
+### Structure des données
+
+| Champ | Type | Description |
+|-------|------|-------------|
+| `id` | Integer | Identifiant unique (automatique) |
+| `name` | String (255) | Nom du produit (obligatoire) |
+| `description` | Text | Description complète (optionnel) |
+| `categorie` | Integer | ID de la catégorie (obligatoire) |
+| `price` | Decimal | Prix unitaire (max 99999999.99) |
+| `stock` | Integer | Quantité disponible (défaut: 0) |
+| `numero_boutique` | String (50) | Référence de localisation (ex: "A12") |
+| `date_added` | Date | Date de création (automatique) |
+| `artisan` | Integer | ID de l'artisan propriétaire |
+| `image` | File | Photo du produit (optionnel) |
+
+### Points clés
+
+1. **Catégorie**
+   - Choisir parmi les catégories existantes
+   - Utiliser l'ID de la catégorie
+   - Exemple: `"categorie": 3`
+
+2. **Numéro de boutique**
+   - Format libre (ex: "A12", "Boutique 3")
+   - Permet de localiser physiquement l'artisan
+   - Optionnel mais recommandé
+
+3. **Gestion des stocks**
+   - Le stock est automatiquement mis à jour lors des ventes
+   - Valeur minimale: 0
+   - Les produits en rupture n'apparaissent pas dans les résultats par défaut
+
+**Exemple de création** :
+```json
+{
+    "name": "Masque traditionnel Bamiléké",
+    "description": "Masque cérémoniel en bois sculpté à la main",
+    "categorie": 2,
+    "price": "75.50",
+    "stock": 8,
+    "numero_boutique": "B12",
+    "artisan": 1
+}
+```
 
 ### Endpoints
 
@@ -375,7 +421,101 @@ Ce module gère le catalogue des produits artisanaux. Seuls les administrateurs 
 *   **En-têtes (Headers) :** `Authorization: Basic <credentials_base64>`
 *   **Réponse (Succès - 204 No Content)**
 
-## 5. Module Ventes
+## 5. Module Catégories
+
+Ce module permet de gérer les catégories de produits. Les catégories permettent d'organiser les produits par type ou par famille.
+
+### Modèle de données
+
+| Champ | Type | Description |
+|-------|------|-------------|
+| id | Integer | Identifiant unique de la catégorie |
+| nom | String (100) | Nom de la catégorie (unique) |
+| description | Text | Description de la catégorie (optionnelle) |
+| date_creation | DateTime | Date de création (automatique) |
+| date_mise_a_jour | DateTime | Date de dernière mise à jour (automatique) |
+
+### Endpoints
+
+#### **GET /api/categories/**
+*   **Description :** Récupère la liste de toutes les catégories.
+*   **Permissions :** Tous les utilisateurs authentifiés
+*   **Réponse (Succès - 200 OK) :**
+    ```json
+    [
+        {
+            "id": 1,
+            "nom": "Sculpture",
+            "description": "Œuvres sculptées en bois, pierre, etc.",
+            "date_creation": "2025-09-12T04:00:00Z",
+            "date_mise_a_jour": "2025-09-12T04:00:00Z"
+        },
+        ...
+    ]
+    ```
+
+#### **POST /api/categories/**
+*   **Description :** Crée une nouvelle catégorie.
+*   **Permissions :** Administrateur uniquement
+*   **Requête (Body JSON) :**
+    ```json
+    {
+        "nom": "Céramique",
+        "description": "Objets en terre cuite et céramique"
+    }
+    ```
+*   **Réponse (Succès - 201 Created) :**
+    ```json
+    {
+        "id": 2,
+        "nom": "Céramique",
+        "description": "Objets en terre cuite et céramique",
+        "date_creation": "2025-09-12T04:05:00Z",
+        "date_mise_a_jour": "2025-09-12T04:05:00Z"
+    }
+    ```
+
+#### **GET /api/categories/{id}/**
+*   **Description :** Récupère les détails d'une catégorie spécifique.
+*   **Permissions :** Tous les utilisateurs authentifiés
+*   **Réponse (Succès - 200 OK) :**
+    ```json
+    {
+        "id": 1,
+        "nom": "Sculpture",
+        "description": "Œuvres sculptées en bois, pierre, etc.",
+        "date_creation": "2025-09-12T04:00:00Z",
+        "date_mise_a_jour": "2025-09-12T04:00:00Z"
+    }
+    ```
+
+#### **PUT /api/categories/{id}/**
+*   **Description :** Met à jour une catégorie existante.
+*   **Permissions :** Administrateur uniquement
+*   **Requête (Body JSON) :**
+    ```json
+    {
+        "nom": "Sculpture sur bois",
+        "description": "Œuvres sculptées principalement en bois"
+    }
+    ```
+*   **Réponse (Succès - 200 OK) :**
+    ```json
+    {
+        "id": 1,
+        "nom": "Sculpture sur bois",
+        "description": "Œuvres sculptées principalement en bois",
+        "date_creation": "2025-09-12T04:00:00Z",
+        "date_mise_a_jour": "2025-09-12T04:10:00Z"
+    }
+    ```
+
+#### **DELETE /api/categories/{id}/**
+*   **Description :** Supprime une catégorie.
+*   **Permissions :** Administrateur uniquement
+*   **Réponse (Succès - 204 No Content)**
+
+## 6. Module Ventes
 
 Ce module gère l'enregistrement et le suivi des transactions de vente. La mise à jour du stock des produits est automatique après chaque vente.
 
