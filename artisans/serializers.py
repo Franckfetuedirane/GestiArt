@@ -18,5 +18,7 @@ class ArtisanSerializer(serializers.ModelSerializer):
         Defines the model and fields to be serialized.
         """
         model = Artisan
-        fields = ('user', 'user_id', 'first_name', 'last_name', 'speciality', 'contact_phone', 'contact_email', 'date_joined', 'department', 'image')
-        read_only_fields = ('date_joined',)
+        fields = '__all__'
+        read_only_fields = ('user',)
+    def get_first_name(self, obj):
+        return obj.user.first_name  # Accédez au prénom de l'utilisateur lié

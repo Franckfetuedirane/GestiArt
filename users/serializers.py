@@ -1,52 +1,39 @@
+# users/serializers.py
 from rest_framework import serializers
-from .models import User
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
 
 class UserSerializer(serializers.ModelSerializer):
-    """
-    Serializer for the User model.
-    Handles reading and updating user data, including password hashing.
-    """
     class Meta:
         model = User
-        fields = ('id', 'email', 'user_type', 'password')
-        extra_kwargs = {'password': {'write_only': True, 'min_length': 8}}
+        fields = ('id', 'email', 'first_name', 'last_name', 'user_type', 'is_active')
 
+class RegisterSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True, required=True, style={'input_type': 'password'})
+    
+    class Meta:
+        model = User
+        fields = ('email', 'password', 'first_name', 'last_name', 'user_type')
+        extra_kwargs = {
+            'password': {'write_only': True},
+            'user_type': {'default': 'artisan'}
+        }
+    
     def create(self, validated_data):
-        """
-        Create and return a new `User` instance, given the validated data.
-        """
         user = User.objects.create_user(**validated_data)
         return user
 
-    def update(self, instance, validated_data):
-        """
-        Update and return an existing `User` instance, given the validated data.
-        Handles password updates separately.
-        """
-        password = validated_data.pop('password', None)
-        user = super().update(instance, validated_data)
-        if password:
-            user.set_password(password)
-            user.save()
-        return user
+class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
+    @classmethod
+    def get_token(cls, user):
+        token = super().get_token(user)
+        token['email'] = user.email
+        token['user_type'] = user.user_type
+        return token
 
-class RegisterSerializer(serializers.ModelSerializer):
-    """
-    Serializer for user registration.
-    Handles creating new User instances with appropriate user_type.
-    """
-    class Meta:
-        model = User
-        fields = ('id', 'email', 'password', 'user_type')
-        extra_kwargs = {'password': {'write_only': True, 'min_length': 8}}
-
-    def create(self, validated_data):
-        """
-        Create and return a new `User` instance for registration.
-        """
-        user = User.objects.create_user(
-            email=validated_data['email'],
-            password=validated_data['password'],
-            user_type=validated_data.get('user_type', 'artisan')
-        )
-        return user
+    def validate(self, attrs):
+        data = super().validate(attrs)
+        data['user'] = UserSerializer(self.user).data
+        return data

@@ -5,3 +5,4 @@ router = DefaultRouter()
 router.register(r'artisans', ArtisanViewSet)
 
 urlpatterns = router.urls
+

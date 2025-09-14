@@ -1,24 +1,102 @@
 from django.db import models
-from users.models import User
+from django.conf import settings
+from django.utils.translation import gettext_lazy as _
 
 class Artisan(models.Model):
     """
-    Represents an Artisan in the GestiArt application.
-    Each artisan is linked to a custom User and stores personal and professional details.
-    Includes a profile image for the artisan.
+    Modèle représentant un artisan.
     """
-    user = models.OneToOneField(User, on_delete=models.CASCADE, primary_key=True, related_name='artisan_profile')
-    first_name = models.CharField(max_length=100)
-    last_name = models.CharField(max_length=100)
-    speciality = models.CharField(max_length=100)
-    contact_phone = models.CharField(max_length=20, blank=True, null=True)
-    contact_email = models.EmailField(blank=True, null=True)
-    date_joined = models.DateField(auto_now_add=True)
-    department = models.CharField(max_length=100, blank=True, null=True)
-    image = models.ImageField(upload_to='artisans_images/', blank=True, null=True)
+    id = models.AutoField(primary_key=True)  # S'assurer que c'est présent
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='artisan_shop'  # Changed to avoid conflict with ArtisanProfile
+    )
+    numero_boutique = models.CharField(
+        _('Numéro de boutique'),
+        max_length=50,
+        unique=True,
+        help_text=_('Numéro unique identifiant la boutique de l\'artisan')
+    )
+    prenom = models.CharField(
+        _('Prénom'),
+        max_length=100
+    )
+    nom = models.CharField(
+        _('Nom'),
+        max_length=100
+    )
+    telephone = models.CharField(
+        _('Téléphone'),
+        max_length=20
+    )
+    email = models.EmailField(
+        _('Email de contact'),
+        blank=True,
+        null=True
+    )
+    adresse = models.TextField(
+        _('Adresse'),
+        blank=True,
+        null=True,
+        help_text=_('Adresse complète de l\'artisan')
+    )
+    specialite = models.CharField(
+        _('Spécialité'),
+        max_length=100,
+        help_text=_('Spécialité principale de l\'artisan')
+    )
+    date_inscription = models.DateTimeField(
+        _('Date d\'inscription'),
+        auto_now_add=True
+    )
+    actif = models.BooleanField(
+        _('Actif'),
+        default=True,
+        help_text=_('Désactiver pour masquer l\'artisan sans supprimer ses données')
+    )
+
+    # class Meta:
+    #     verbose_name = _('Artisan')
+    #     verbose_name_plural = _('Artisans')
+    #     ordering = ['nom', 'prenom']
+
+    # def __str__(self):
+    #     return f"{self.prenom} {self.nom}"
 
     def __str__(self):
-        """
-        Returns a string representation of the artisan.
-        """
-        return f"{self.first_name} {self.last_name}"
+        return f"{self.prenom} {self.nom}"
+
+    class Meta:
+        verbose_name = _('Artisan')
+        verbose_name_plural = _('Artisans')
+
+    @property
+    def nom_complet(self):
+        """Retourne le nom complet de l'artisan."""
+        return f"{self.prenom} {self.nom}"
+
+    @property
+    def total_ventes(self):
+        """Retourne le montant total des ventes de l'artisan."""
+        from django.db.models import Sum, F
+        from ventes.models import Vente
+        
+        total = Vente.objects.filter(artisan=self).aggregate(
+            total=Sum(F('lignes_vente__quantity') * F('lignes_vente__unit_price'))
+        )['total'] or 0
+        
+        return total
+
+    @property
+    def nombre_produits_vendus(self):
+        """Retourne le nombre total de produits vendus par l'artisan."""
+        from django.db.models import Sum
+        from ventes.models import Vente
+        
+        total = Vente.objects.filter(artisan=self).aggregate(
+            total=Sum('lignes_vente__quantity')
+        )['total'] or 0
+        
+        return total
