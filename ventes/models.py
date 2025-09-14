@@ -5,6 +5,7 @@ from produits.models import Produit
 from artisans.models import Artisan
 import uuid
 
+
 def generate_sale_number():
     """
     Génère un numéro de vente unique au format V-YYYYMMDD-XXXX

@@ -6,6 +6,9 @@ from artisans.models import Artisan
 from produits.models import Produit
 from ventes.models import Vente
 from users.permissions import IsAdminUser, IsSecondaryAdminUser
+from django.utils import timezone
+from datetime import timedelta
+from ventes.models import Vente, LigneVente
 
 class StatsView(APIView):
     """
@@ -28,22 +31,37 @@ class StatsView(APIView):
         """
         total_artisans = Artisan.objects.count()
         active_products = Produit.objects.filter(stock__gt=0).count()
-        total_sales_global = Vente.objects.aggregate(total_sum=Sum(F('quantity') * F('unit_price')))['total_sum'] or 0
+
+      # Calculer le chiffre d'affaires total à partir des lignes de vente
+        total_sales_global = LigneVente.objects.aggregate(
+            total_sum=Sum(F('quantity') * F('unit_price'))
+        )['total_sum'] or 0
+
         total_revenue = total_sales_global
 
-        sales_by_artisan = Vente.objects.values('artisan__first_name', 'artisan__last_name')\
-                                       .annotate(total_sales=Sum(F('quantity') * F('unit_price')))\
-                                       .order_by('-total_sales')
+        # Ventes par artisan
+        sales_by_artisan = LigneVente.objects.values(
+            'vente__artisan__id',
+            'vente__artisan__prenom',
+            'vente__artisan__nom'
+        ).annotate(
+            total_sales=Sum(F('quantity') * F('unit_price'))
+        ).order_by('-total_sales')
 
-        top_selling_products = Vente.objects.values('product__name')\
-                                        .annotate(total_quantity_sold=Sum('quantity'))\
-                                        .order_by('-total_quantity_sold')[:5]
+  # Produits les plus vendus
+        top_selling_products = LigneVente.objects.values(
+            'product__id',
+            'product__name'
+        ).annotate(
+            total_quantity_sold=Sum('quantity'),
+            total_revenue=Sum(F('quantity') * F('unit_price'))
+        ).order_by('-total_quantity_sold')[:5]
 
         data = {
             'total_artisans': total_artisans,
             'active_products': active_products,
-            'total_sales_global': total_sales_global,
-            'total_revenue': total_revenue,
+            'total_sales_global': float(total_sales_global),
+            'total_revenue': float(total_revenue),
             'sales_by_artisan': list(sales_by_artisan),
             'top_selling_products': list(top_selling_products),
         }
@@ -107,118 +125,56 @@ class ReportCardView(APIView):
         
         return Response(report_data, status=status.HTTP_200_OK)
 
-# stats/views.py
-# from rest_framework.views import APIView
-# from rest_framework.response import Response
-# from rest_framework import status
-# from rest_framework.permissions import IsAuthenticated, IsAdminUser
-# from django.db.models import Sum, F, Count
-# from artisans.models import Artisan
-# from produits.models import Produit
-# from ventes.models import Vente, LigneVente
-# from django.utils import timezone
-# from datetime import timedelta
-
-# class IsSecondaryAdminUser(IsAdminUser):
-#     """
-#     Permission personnalisée pour les administrateurs secondaires.
-#     """
-#     def has_permission(self, request, view):
-#         return super().has_permission(request, view) or (
-#             request.user and 
-#             request.user.is_authenticated and 
-#             hasattr(request.user, 'user_type') and
-#             request.user.user_type == 'secondary_admin'
-#         )
-
-# class StatsView(APIView):
-#     """
-#     API endpoint to retrieve general statistics for the GestiArt application.
-#     Accessible by Admin and Secondary Admin users.
-#     """
-#     permission_classes = [IsAuthenticated, IsAdminUser | IsSecondaryAdminUser]
-
-#     def get(self, request, format=None):
-#         try:
-#             # 1. Statistiques de base
-#             total_artisans = Artisan.objects.count()
-#             active_products = Produit.objects.filter(stock__gt=0).count()
-            
-#             # 2. Calcul du chiffre d'affaires total
-#             total_sales_global = 0
-#             for vente in Vente.objects.all():
-#                 for ligne in vente.lignes_vente.all():
-#                     total_sales_global += ligne.quantity * ligne.unit_price
-
-#             # 3. Ventes par artisan
-#             sales_by_artisan = []
-#             for artisan in Artisan.objects.all():
-#                 total_ventes = 0
-#                 for vente in Vente.objects.filter(artisan=artisan):
-#                     for ligne in vente.lignes_vente.all():
-#                         total_ventes += ligne.quantity * ligne.unit_price
-                
-#                 sales_by_artisan.append({
-#                     'artisan_id': artisan.id,
-#                     'artisan_name': f"{artisan.prenom} {artisan.nom}",
-#                     'total_sales': float(total_ventes)
-#                 })
-
-#             # 4. Produits les plus vendus
-#             from collections import defaultdict
-#             product_sales = defaultdict(int)
-            
-#             for vente in Vente.objects.all():
-#                 for ligne in vente.lignes_vente.all():
-#                     product_sales[ligne.product] += ligne.quantity
-            
-#             top_products = []
-#             for product, quantity in sorted(product_sales.items(), key=lambda x: x[1], reverse=True)[:5]:
-#                 top_products.append({
-#                     'product_id': product.id,
-#                     'product_name': product.nom,
-#                     'total_sold': quantity,
-#                     'revenue': float(quantity * product.prix)
-#                 })
-
-#             # 5. Statistiques mensuelles
-#             months = []
-#             sales_data = []
-#             today = timezone.now()
-            
-#             for i in range(5, -1, -1):  # 6 derniers mois
-#                 month = today - timedelta(days=30*i)
-#                 month_start = month.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-#                 next_month = (month_start + timedelta(days=32)).replace(day=1)
-                
-#                 month_sales = 0
-#                 for vente in Vente.objects.filter(
-#                     date_vente__gte=month_start,
-#                     date_vente__lt=next_month
-#                 ):
-#                     for ligne in vente.lignes_vente.all():
-#                         month_sales += ligne.quantity * ligne.unit_price
-                
-#                 months.append(month.strftime('%b %Y'))
-#                 sales_data.append(float(month_sales))
-
-#             return Response({
-#                 'total_artisans': total_artisans,
-#                 'active_products': active_products,
-#                 'total_sales_global': float(total_sales_global),
-#                 'total_revenue': float(total_sales_global),
-#                 'sales_by_artisan': sales_by_artisan,
-#                 'top_selling_products': top_products,
-#                 'monthly_sales': {
-#                     'labels': months,
-#                     'data': sales_data
-#                 }
-#             })
-
-#         except Exception as e:
-#             import traceback
-#             traceback.print_exc()
-#             return Response(
-#                 {'error': str(e), 'details': 'Erreur lors du calcul des statistiques'},
-#                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
-#             )
+class DashboardStatsView(APIView):
+    def get(self, request):
+        # Statistiques des ventes
+        total_ventes = Vente.objects.count()
+        
+        # Calculer le chiffre d'affaires total
+        total_sales = LigneVente.objects.aggregate(
+            total=Sum(F('quantity') * F('unit_price'))
+        )['total'] or 0
+        
+        # Produits les plus vendus
+        top_products = LigneVente.objects.values(
+            'product__id',
+            'product__name'
+        ).annotate(
+            total_quantity=Sum('quantity'),
+            total_sales=Sum(F('quantity') * F('unit_price'))
+        ).order_by('-total_quantity')[:5]  # Top 5 des produits
+        
+        # Statistiques par artisan
+        stats_artisans = Vente.objects.values(
+            'artisan__id',
+            'artisan__prenom',
+            'artisan__nom'
+        ).annotate(
+            total_ventes=Count('id'),
+            chiffre_affaires=Sum('lignes_vente__quantity') * F('lignes_vente__unit_price')
+        )
+        
+        # Statistiques mensuelles
+        start_date = timezone.now().replace(day=1, hour=0, minute=0, second=0)
+        end_date = (start_date + timedelta(days=32)).replace(day=1)
+        
+        stats_mensuelles = LigneVente.objects.filter(
+            vente__sale_date__gte=start_date,
+            vente__sale_date__lt=end_date
+        ).aggregate(
+            total_ventes=Count('vente', distinct=True),
+            total_produits=Sum('quantity'),
+            chiffre_affaires=Sum(F('quantity') * F('unit_price'))
+        )
+        
+        return Response({
+            'total_ventes': total_ventes,
+            'chiffre_affaires_total': float(total_sales),
+            'periode': {
+                'debut': start_date,
+                'fin': end_date
+            },
+            'top_produits': list(top_products),
+            'stats_artisans': list(stats_artisans),
+            'stats_mensuelles': stats_mensuelles
+        })
