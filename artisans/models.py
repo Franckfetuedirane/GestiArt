@@ -1,6 +1,15 @@
 from django.db import models
 from django.conf import settings
 from django.utils.translation import gettext_lazy as _
+import os
+
+def artisan_photo_path(instance, filename):
+    """
+    Génère le chemin de stockage pour la photo de l'artisan.
+    """
+    # Utilisez le nom de l'utilisateur pour éviter les conflits
+    filename = os.path.basename(filename)
+    return f"artisans/{instance.user.username}/{filename}"
 
 class Artisan(models.Model):
     """
@@ -47,6 +56,16 @@ class Artisan(models.Model):
         max_length=100,
         help_text=_('Spécialité principale de l\'artisan')
     )
+    
+    photo = models.ImageField(
+        _('Photo de profil'),
+        upload_to=artisan_photo_path,
+        blank=True,
+        null=True,
+        help_text=_('Photo de profil de l\'artisan')
+    )
+
+
     date_inscription = models.DateTimeField(
         _('Date d\'inscription'),
         auto_now_add=True
@@ -57,13 +76,6 @@ class Artisan(models.Model):
         help_text=_('Désactiver pour masquer l\'artisan sans supprimer ses données')
     )
 
-    # class Meta:
-    #     verbose_name = _('Artisan')
-    #     verbose_name_plural = _('Artisans')
-    #     ordering = ['nom', 'prenom']
-
-    # def __str__(self):
-    #     return f"{self.prenom} {self.nom}"
 
     def __str__(self):
         return f"{self.prenom} {self.nom}"

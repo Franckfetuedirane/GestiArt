@@ -1,53 +1,33 @@
+# produits/serializers.py
 from rest_framework import serializers
 from .models import Produit, Categorie
-from artisans.models import Artisan
 from artisans.serializers import ArtisanSerializer
 
 class ProduitSerializer(serializers.ModelSerializer):
-    """
-    Serializer for the Produit model.
-    Includes nested ArtisanSerializer for read-only artisan details
-    and a writable `artisan_id` field for product creation/update.
-    Also includes custom validations for `stock` and `price`.
-    """
-    artisan = ArtisanSerializer(read_only=True)
-    artisan_id = serializers.PrimaryKeyRelatedField(queryset=Artisan.objects.all(), source='artisan', write_only=True, required=False)
-
+    artisan_detail = ArtisanSerializer(source='artisan', read_only=True)
+    
     class Meta:
-        """
-        Meta class for ProduitSerializer.
-        Defines the model and fields to be serialized, and read-only fields.
-        """
         model = Produit
         fields = [
-            'id', 'name', 'description', 'categorie', 'price', 'stock', 
-            'numero_boutique', 'artisan', 'artisan_id', 'date_added', 'image'
+            'id', 'name', 'description', 'categorie', 'artisan', 'artisan_detail',
+            'price', 'stock', 'numero_boutique', 'image'
         ]
-        read_only_fields = ['id', 'date_added']
+        read_only_fields = ['date_added']
+        extra_kwargs = {
+            'categorie': {'required': True},
+            'artisan': {'required': True},
+            'price': {'required': True, 'min_value': 0},
+            'stock': {'required': True, 'min_value': 0}
+        }
 
-    def validate_stock(self, value):
-        """
-        Validates that the stock value is not negative.
-        """
-        if value < 0:
-            raise serializers.ValidationError("Le stock ne peut pas être négatif.")
+    def validate_artisan(self, value):
+        if not value:
+            raise serializers.ValidationError("Un artisan doit être sélectionné")
         return value
-
-    def validate_price(self, value):
-        """
-        Validates that the price value is positive.
-        """
-        if value <= 0:
-            raise serializers.ValidationError("Le prix doit être supérieur à zéro.")
-        return value
-
 
 class CategorieSerializer(serializers.ModelSerializer):
-    """
-    Serializer pour le modèle Categorie.
-    Permet de sérialiser et désérialiser les catégories.
-    """
     class Meta:
         model = Categorie
         fields = ['id', 'nom', 'description', 'date_creation', 'date_mise_a_jour']
-        read_only_fields = ['id', 'date_creation', 'date_mise_a_jour']
+        read_only_fields = ['date_creation', 'date_mise_a_jour']
+

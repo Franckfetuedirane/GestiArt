@@ -23,6 +23,7 @@ load_dotenv()  # Charge les variables d'environnement depuis .env
 SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-2+9)ucrxiv5sw$$my)b3%)9+qqy+ed@v=jroqnl0!-pbyc(%7-')
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+# os.makedirs(os.path.join(MEDIA_ROOT, 'artisans', 'photos'), exist_ok=True)
 
 
 # Quick-start development settings - unsuitable for production
@@ -149,7 +150,8 @@ STATIC_URL = 'static/'
 
 # Media files
 MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+os.makedirs(os.path.join(MEDIA_ROOT, 'artisans', 'photos'), exist_ok=True)
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field

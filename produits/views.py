@@ -1,100 +1,99 @@
-from django.shortcuts import get_object_or_404
+# produits/views.py
+import logging
 from rest_framework import viewsets, status, permissions
 from rest_framework.response import Response
-from rest_framework.decorators import action
 from .models import Produit, Categorie
 from .serializers import ProduitSerializer, CategorieSerializer
-from users.permissions import IsAdminUser, IsArtisanUser, IsAdminOrArtisanOwner
 from artisans.models import Artisan
-import logging
+from django.shortcuts import get_object_or_404
 
 logger = logging.getLogger(__name__)
 
-# Create your views here.
-
-class ProduitViewSet(viewsets.ModelViewSet):
-    """
-    API endpoint that allows products to be viewed, created, updated or deleted.
-
-    Permissions:
-    - All authenticated users can list products.
-    - Admins can perform all CRUD operations.
-    - Artisans can only create, view, update and delete their own products.
-    """
-    queryset = Produit.objects.all()
-    serializer_class = ProduitSerializer
-    permission_classes = [IsAdminOrArtisanOwner]
-
-    def get_queryset(self):
-        """
-        Filters the queryset based on the user's role.
-        Artisans can only see their own products.
-        Admins can see all products.
-        """
-        queryset = super().get_queryset()
-        if self.request.user.user_type == 'artisan':
-            return queryset.filter(artisan__user=self.request.user)
-        return queryset
-
-    def perform_create(self, serializer):
-        """
-        Associates the current user as the artisan when creating a new product.
-        Only admins can specify a different artisan.
-        """
-        if self.request.user.user_type == 'artisan':
-            # For artisans, automatically associate them as the product's artisan
-            artisan = get_object_or_404(Artisan, user=self.request.user)
-            serializer.save(artisan=artisan)
-        else:
-            # For admins, use the provided artisan or default to the current user's artisan profile if exists
-            if 'artisan' not in serializer.validated_data:
-                try:
-                    artisan = Artisan.objects.get(user=self.request.user)
-                    serializer.save(artisan=artisan)
-                except Artisan.DoesNotExist:
-                    serializer.save()
-    
-    def get_permissions(self):
-        """
-        Instantiates and returns the list of permissions that this view requires.
-        """
-        if self.action in ['list', 'retrieve']:
-            permission_classes = [permissions.IsAuthenticated]
-        elif self.action == 'create':
-            permission_classes = [IsAdminUser | IsArtisanUser]
-        else:
-            permission_classes = [IsAdminOrArtisanOwner]
-        return [permission() for permission in permission_classes]
-    
-    def destroy(self, request, *args, **kwargs):
-        """
-        Override destroy to handle soft delete for products.
-        """
-        instance = self.get_object()
-        if request.user.user_type == 'artisan':
-            # For artisans, do soft delete (set is_active to False)
-            instance.is_active = False
-            instance.save()
-            return Response(status=status.HTTP_204_NO_CONTENT)
-        # For admins, do hard delete
-        self.perform_destroy(instance)
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
-
 class CategorieViewSet(viewsets.ModelViewSet):
-    """
-    API endpoint pour gérer les catégories.
-    
-    Permissions :
-    - Tous les utilisateurs authentifiés peuvent lister les catégories.
-    - Seuls les administrateurs peuvent créer, modifier ou supprimer des catégories.
-    """
     queryset = Categorie.objects.all()
     serializer_class = CategorieSerializer
-    permission_classes = [permissions.IsAdminUser | permissions.IsAuthenticatedOrReadOnly]
-    
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+
+    def create(self, request, *args, **kwargs):
+        nom = request.data.get('nom', '').lower().strip()
+        if nom and Categorie.objects.filter(nom__iexact=nom).exists():
+            return Response(
+                {"error": "Une catégorie avec ce nom existe déjà."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        return super().create(request, *args, **kwargs)
+
+class ProduitViewSet(viewsets.ModelViewSet):
+    serializer_class = ProduitSerializer
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    filterset_fields = ['categorie', 'artisan']
+
     def get_queryset(self):
-        """
-        Retourne toutes les catégories triées par nom.
-        """
-        return Categorie.objects.all().order_by('nom')
+        queryset = Produit.objects.all()
+        categorie = self.request.query_params.get('categorie')
+        artisan = self.request.query_params.get('artisan')
+        
+        if categorie:
+            queryset = queryset.filter(categorie_id=categorie)
+        if artisan:
+            queryset = queryset.filter(artisan_id=artisan)
+            
+        return queryset
+
+    def create(self, request, *args, **kwargs):
+        logger.info(f"Données reçues : {request.data}")
+        
+        if not request.user.is_staff:
+            return Response(
+                {"error": "Seuls les administrateurs peuvent ajouter des produits"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        data = request.data.copy()
+        
+        # Vérifier si un artisan est spécifié
+        artisan_id = data.get('artisan')
+        if not artisan_id:
+            return Response(
+                {"error": "Veuillez sélectionner un artisan."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        # Vérifier que l'artisan existe
+        try:
+            artisan = Artisan.objects.get(pk=artisan_id)
+        except (ValueError, Artisan.DoesNotExist):
+            return Response(
+                {"error": "L'artisan sélectionné n'existe pas."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        serializer = self.get_serializer(data=data)
+        if not serializer.is_valid():
+            logger.error(f"Erreur de validation : {serializer.errors}")
+            return Response(
+                {"error": "Données invalides", "details": serializer.errors},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            self.perform_create(serializer)
+            headers = self.get_success_headers(serializer.data)
+            return Response(
+                serializer.data,
+                status=status.HTTP_201_CREATED,
+                headers=headers
+            )
+        except Exception as e:
+            logger.error(f"Erreur lors de la création du produit : {str(e)}")
+            return Response(
+                {"error": f"Erreur serveur : {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            permission_classes = [permissions.IsAdminUser]
+        else:
+            permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+        return [permission() for permission in permission_classes]

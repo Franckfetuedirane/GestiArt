@@ -8,6 +8,8 @@ from produits.models import Produit
 from produits.serializers import ProduitSerializer
 from artisans.models import Artisan
 from artisans.serializers import ArtisanSerializer
+from produits.serializers import ProduitSerializer as ProduitVenteSerializer
+
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +31,7 @@ class LigneVenteSerializer(serializers.ModelSerializer):
     class Meta:
         model = LigneVente
         fields = [
-            'id', 'product', 'product_id', 'product_name', 'product_details', 
+            'id', 'designation', 'product', 'product_id', 'product_name', 'product_details', 
             'quantity', 'unit_price', 'sous_total'
         ]
         read_only_fields = ['product', 'unit_price', 'sous_total', 'product_name']
@@ -98,6 +100,7 @@ class VenteSerializer(serializers.ModelSerializer):
     lignes_vente = LigneVenteSerializer(many=True, required=False, write_only=True)
     artisan_details = ArtisanSerializer(source='artisan', read_only=True)
     numero_vente = serializers.CharField(read_only=True)
+    produits = serializers.SerializerMethodField()
     
     # Champ pour la sélection de l'artisan (affiché comme une liste déroulante dans l'admin)
     artisan = serializers.PrimaryKeyRelatedField(
@@ -141,26 +144,38 @@ class VenteSerializer(serializers.ModelSerializer):
         help_text="Dictionnaire des quantités par ID de produit"
     )
 
-    def get_artisan_products(self, obj):
-        """Retourne la liste des produits de l'artisan"""
-        artisan = obj.artisan if hasattr(obj, 'artisan') else None
+    # Recherchez la méthode get_produits dans VenteSerializer
+    def get_produits(self, obj):
+        artisan = obj.artisan
         if not artisan:
             return []
         
+        # Utilisez le bon nom de relation 'produits' au lieu de 'produit_set'
+        produits = artisan.produits.all()
+        
+        # Retournez les données sérialisées
+        return ProduitVenteSerializer(produits, many=True).data
+
+    # artisan_products = serializers.SerializerMethodField(
+    #     read_only=True,
+    #     help_text="Liste des produits disponibles pour l'artisan sélectionné"
+    # )
+
+    def get_artisan_products(self, obj):
+        artisan = obj.artisan if hasattr(obj, 'artisan') else None
+        if not artisan:
+            return []
+            
         return [
             {
                 'id': p.id,
                 'name': p.name,
                 'price': str(p.price),
-                'stock': p.stock
+                'stock': p.stock,
+                'categorie': p.categorie.nom if p.categorie else None
             }
-            for p in artisan.produit_set.all()
+            for p in artisan.produits.all()
         ]
-    
-    artisan_products = serializers.SerializerMethodField(
-        read_only=True,
-        help_text="Liste des produits disponibles pour l'artisan sélectionné"
-    )
     
     def validate_artisan_name(self, value):
         """Valide et récupère l'artisan par son nom"""
@@ -207,13 +222,13 @@ class VenteSerializer(serializers.ModelSerializer):
         model = Vente
         fields = [
             'id', 'numero_vente', 'artisan', 'artisan_details',
-            'nom_du_client', 'sale_date', 'total_amount', 'products_count', 
+            'nom_du_client', 'designation', 'sale_date', 'total_amount', 'products_count', 
             'lignes_vente', 'produits', 'produits_selectionnes', 'quantites',
-            'artisan_products'  # Ajout du champ manquant
+              # Ajout du champ manquant
         ]
         read_only_fields = [
             'id', 'numero_vente', 'sale_date', 'total_amount', 
-            'products_count', 'artisan_details', 'produits', 'artisan_products'
+            'products_count', 'artisan_details', 'produits', 
         ]
     
     def get_produits(self, obj):
@@ -233,7 +248,7 @@ class VenteSerializer(serializers.ModelSerializer):
             return []
             
         # Récupérer les produits en stock avec leurs catégories
-        produits = artisan.produit_set.filter(
+        produits = artisan.produits.filter(
             stock__gt=0
         ).select_related('categorie').order_by('name')
         
@@ -243,7 +258,7 @@ class VenteSerializer(serializers.ModelSerializer):
                 'name': p.name,
                 'price': str(p.price),
                 'stock': p.stock,
-                'categorie': p.categorie.name if p.categorie else None,
+                'categorie': p.categorie.nom if p.categorie else None,
                 'selected': obj.lignes_vente.filter(product=p).exists() if obj else False,
                 'quantite': obj.lignes_vente.get(product=p).quantity if obj and obj.lignes_vente.filter(product=p).exists() else 1
             }
@@ -417,3 +432,7 @@ class VenteSerializer(serializers.ModelSerializer):
             product.save(update_fields=['stock'])
         
         return vente
+class ProduitVenteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Produit
+        fields = ['id', 'name', 'price', 'stock']

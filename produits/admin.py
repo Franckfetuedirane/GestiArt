@@ -1,22 +1,31 @@
+
+
+# produits/admin.py
 from django.contrib import admin
 from .models import Produit, Categorie
 
 @admin.register(Categorie)
 class CategorieAdmin(admin.ModelAdmin):
-    list_display = ('nom', 'description', 'date_creation', 'date_mise_a_jour')
-    search_fields = ('nom', 'description')
+    list_display = ('nom', 'date_creation')
+    search_fields = ('nom',)
     list_filter = ('date_creation',)
-    prepopulated_fields = {}
-    ordering = ('nom',)
 
 @admin.register(Produit)
 class ProduitAdmin(admin.ModelAdmin):
-    list_display = ('name', 'artisan', 'get_categorie', 'price', 'stock', 'date_added')
-    search_fields = ('name', 'categorie__nom', 'artisan__first_name', 'artisan__last_name')
+    list_display = ('name', 'categorie', 'artisan', 'price', 'stock', 'date_added')
     list_filter = ('categorie', 'artisan', 'date_added')
-    raw_id_fields = ('artisan',)
-    autocomplete_fields = ('categorie',)
+    search_fields = ('name', 'description')
+    autocomplete_fields = ['artisan']  # Pour faciliter la sélection de l'artisan
 
-    def get_categorie(self, obj):
-        return obj.categorie.nom if obj.categorie else "-"
-    get_categorie.short_description = 'Catégorie'
+    readonly_fields = ('date_added',)
+    fieldsets = (
+        (None, {
+            'fields': ('name', 'description', 'categorie', 'artisan')
+        }),
+        ('Détails', {
+            'fields': ('price', 'stock', 'numero_boutique', 'image')
+        }),
+        ('Dates', {
+            'fields': ('date_added',)
+        }),
+    )

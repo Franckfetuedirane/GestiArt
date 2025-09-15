@@ -67,8 +67,11 @@ class LigneVente(models.Model):
 
     def save(self, *args, **kwargs):
         # S'assurer que le prix unitaire est bien celui du produit
-        if not self.unit_price:
-            self.unit_price = self.product.price
+        if not self.pk:  # Nouvelle vente
+            for ligne in self.lignes_vente.all():
+                produit = ligne.produit
+                produit.stock -= ligne.quantite
+                produit.save()
         super().save(*args, **kwargs)
         # Mettre à jour le stock du produit
         if self.pk:  # Si la ligne existe déjà
@@ -80,9 +83,10 @@ class LigneVente(models.Model):
         self.product.save()
 
     def delete(self, *args, **kwargs):
-        # Remettre le stock à jour avant la suppression
-        self.product.stock += self.quantity
-        self.product.save()
+        for ligne in self.lignes_vente.all():
+            produit = ligne.produit
+            produit.stock += ligne.quantite
+            produit.save()
         super().delete(*args, **kwargs)
 
 
@@ -113,6 +117,13 @@ class Vente(models.Model):
         help_text='Nom du client pour la vente',
         blank=True,
         null=True
+    )
+    designation = models.CharField(
+        'Désignation',
+        max_length=255,
+        help_text="Description ou référence de la vente",
+        blank=True,
+        default=''   
     )
     
     # Champs calculés (propriétés)
@@ -192,4 +203,4 @@ class Vente(models.Model):
 
     def __str__(self):
         """Représentation textuelle de la vente."""
-        return f"{self.numero_vente} - {self.products_count} produits - {self.total_amount}€"
+        return f"{self.numero_vente} - {self.products_count} produits - {self.total_amount}FCFA"

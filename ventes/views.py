@@ -129,6 +129,12 @@ class VenteViewSet(viewsets.ModelViewSet):
                 {"detail": "Une erreur est survenue lors de la récupération des produits."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+
+    def perform_create(self, serializer):
+        vente = serializer.save()
+        vente.clean()  # Valide le stock
+        vente.save()   # Déclenche la mise à jour du stock
     
     def create(self, request, *args, **kwargs):
         """
@@ -209,3 +215,5 @@ class VenteViewSet(viewsets.ModelViewSet):
                 {"detail": "Une erreur est survenue lors de la création de la vente."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+            
+
